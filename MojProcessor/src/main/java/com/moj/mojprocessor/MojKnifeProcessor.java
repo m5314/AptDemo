@@ -147,6 +147,7 @@ public class MojKnifeProcessor extends AbstractProcessor {
         MethodSpec.Builder bindViewMethod = MethodSpec.methodBuilder("bindView");
         bindViewMethod.addParameter(parameter.build());
         bindViewMethod.addModifiers(PUBLIC);
+        bindViewMethod.addAnnotation(Override.class);
         bindViewMethod.addStatement("$T temp = ($T)target",parent,parent);
         for (Element element :
                 elementList) {
