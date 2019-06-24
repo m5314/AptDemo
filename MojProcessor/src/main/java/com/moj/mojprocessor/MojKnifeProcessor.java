@@ -9,7 +9,6 @@ import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -57,7 +56,7 @@ public class MojKnifeProcessor extends AbstractProcessor {
         filer = processingEnv.getFiler();
         messager = processingEnv.getMessager();
         typeUtils = processingEnv.getTypeUtils();
-        messager.printMessage(Diagnostic.Kind.NOTE, "start");
+
     }
 
     @Override
@@ -77,11 +76,11 @@ public class MojKnifeProcessor extends AbstractProcessor {
         }
         elementPackage.clear();
         Set<? extends Element> bindViewElement = roundEnvironment.getElementsAnnotatedWith(BindView.class);
-        messager.printMessage(Diagnostic.Kind.NOTE, "start");
+
         collectData(bindViewElement);
         //&#x6839;&#x636E;elementPackage&#x4E2D;&#x7684;&#x6570;&#x636E;&#x751F;&#x6210;.java&#x4EE3;&#x7801;
         generateCode();
-        messager.printMessage(Diagnostic.Kind.NOTE, "end");
+
         return true;
     }
 
@@ -120,9 +119,9 @@ public class MojKnifeProcessor extends AbstractProcessor {
             //&#x901A;&#x8FC7;JavaPoet&#x751F;&#x6210;bindView&#x7684;MethodSpec
             MethodSpec methodSpec = generateBindViewMethod(parent,elements);
 
-            messager.printMessage(Diagnostic.Kind.NOTE, "end");
+
             String packageName = getPackage(parent).getQualifiedName().toString();
-            messager.printMessage(Diagnostic.Kind.NOTE, "end");
+
             ClassName viewBinderInterface = ClassName.get(elementUtils.getTypeElement(VIEW_BINDER));
             String className = parent.getQualifiedName().toString().substring(
                     packageName.length() + 1).replace('.', '$');
@@ -130,17 +129,27 @@ public class MojKnifeProcessor extends AbstractProcessor {
 
             try {
                 //&#x751F;&#x6210; className_ViewBinding.java&#x6587;&#x4EF6;
-                JavaFile.builder(packageName, TypeSpec.classBuilder(bindingClassName)
+                TypeSpec.Builder builder = TypeSpec.classBuilder(bindingClassName)
                         .addModifiers(PUBLIC)
                         .addSuperinterface(viewBinderInterface)
-                        .addMethod(methodSpec)
-                        .build()
+                        .addMethod(methodSpec);
+
+                TypeElement element = elementUtils.getTypeElement(parent.getSuperclass().toString());
+                if(elementPackage.containsKey(element)){
+                    messager.printMessage(Diagnostic.Kind.NOTE, element.getSimpleName().toString());
+                    builder.superclass(ClassName.get(getPackage(element).getQualifiedName().toString(),element.getSimpleName()+"_ViewBinding"));
+                }
+
+
+                JavaFile.builder(packageName, builder.build()
                 ).build().writeTo(filer);
-            } catch (IOException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }
     }
+
+
 
     private MethodSpec generateBindViewMethod(TypeElement parent,List<Element> elementList) {
         ParameterSpec.Builder parameter = ParameterSpec.builder(TypeName.OBJECT, "target");
@@ -148,6 +157,10 @@ public class MojKnifeProcessor extends AbstractProcessor {
         bindViewMethod.addParameter(parameter.build());
         bindViewMethod.addModifiers(PUBLIC);
         bindViewMethod.addAnnotation(Override.class);
+
+        if(elementPackage.containsKey(elementUtils.getTypeElement(parent.getSuperclass().toString()))){
+            bindViewMethod.addStatement("super.bindView(target)");
+        }
         bindViewMethod.addStatement("$T temp = ($T)target",parent,parent);
         for (Element element :
                 elementList) {
